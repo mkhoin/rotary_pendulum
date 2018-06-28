@@ -1,12 +1,13 @@
-import gym
-import environment as Env
-import pylab
-import numpy as np
-from keras.layers import Dense
-from keras.models import Sequential
-from keras.optimizers import Adam
-from keras import backend as K
+from environment import Env
+# import pylab
+# import numpy as np
+# from keras.layers import Dense
+# from keras.models import Sequential
+# from keras.optimizers import Adam
+# from keras import backend as K
 from datetime import datetime
+import random
+import time
 
 if __name__ == "__main__":
     print(str(datetime.now()) + ' started')
@@ -14,5 +15,27 @@ if __name__ == "__main__":
     env.reset()
     print(env.observation_space_shape)
     print(env.action_space_shape)
-    # print(env.env.action_space.low)
-    # print(env.env.action_space.high)
+
+    MAX_NUM_STEP = 1000
+
+    try:
+        for step in range(MAX_NUM_STEP):
+            if step % 2 == 0:
+                action = random.randrange(0, 100)
+            else:
+                action = random.randrange(-100, 0)
+
+            next_state, reward, done = env.step(action)
+
+            print("action: {0} -->\nnext State: {1}\nreward: {2}\ndone: {3}\n".format(
+                action,
+                next_state,
+                reward,
+                done
+            ))
+
+            time.sleep(0.1)
+
+        env.close()
+    except KeyboardInterrupt as e:
+        env.close()
