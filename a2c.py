@@ -27,6 +27,9 @@ if __name__ == "__main__":
 
             next_state, reward, done = env.step(action)
 
+            now = datetime.now()
+            print(now)
+
             print("action: {0} -->\nnext State: {1}\nreward: {2}\ndone: {3}\n".format(
                 action,
                 next_state,
