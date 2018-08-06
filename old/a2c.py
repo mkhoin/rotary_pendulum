@@ -27,17 +27,17 @@ if __name__ == "__main__":
 
             next_state, reward, done = env.step(action)
 
-            now = datetime.now()
-            print(now)
+            #now = datetime.now()
+            #print(now)
 
-            print("action: {0} -->\nnext State: {1}\nreward: {2}\ndone: {3}\n".format(
+            print("action: {0}, next State: {1}, reward: {2}, done: {3}".format(
                 action,
                 next_state,
                 reward,
                 done
             ))
 
-            time.sleep(0.1)
+            #time.sleep(1)
 
         env.close()
     except KeyboardInterrupt as e:

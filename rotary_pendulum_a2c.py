@@ -108,10 +108,7 @@ if __name__ == "__main__":
     print(str(datetime.now()) + ' started')
     env = Env()
 
-    # print(env.observation_space_shape)
-    # print(env.action_space_shape)
-
-    state_size = env.observation_space_shape[0]
+    state_size = env.state_space_shape[0]
     action_size = env.action_space_shape[0]
 
     # 액터-크리틱(A2C) 에이전트 생성
@@ -123,28 +120,33 @@ if __name__ == "__main__":
         for e in range(EPISODES):
             done = False
             score = 0
+            step = 0
+
             state = env.reset()
-            print("state : ", state)
             state = np.reshape(state, [1, state_size])
 
             while not done:
-                action = agent.get_action(state)
-                #real_action = int(np.array([(action - (action_size - 1) / 2) / ((action_size - 1) / 4)]))
-                real_action = (action - 5) * 10
-                next_state, reward, done = env.step(real_action)
+                if e == 0:              # explore in the first episode
+                    if step % 4 < 2:
+                        action_index = random.randrange(6, 10)
+                    else:
+                        action_index = random.randrange(0, 4)
+                else:
+                    action_index = agent.get_action(state)
+
+                action = (action_index - 5) * 20
+                next_state, reward, done, info = env.step(action)
                 next_state = np.reshape(next_state, [1, state_size])
 
-                now = datetime.now()
-                print(now)
+                step += 1
 
-                print("action: {0} -->\nnext State: {1}\nreward: {2}\ndone: {3}\n".format(
-                    action,
-                    next_state,
-                    reward,
-                    done
+                # now = datetime.now()
+                # print(now)
+                print("episode:{0} || step:{1} || action:{2} || cosine theta:{3} || reward:{4} || done:{5}".format(
+                    e, step, action_index, round(next_state[0][0], 4), round(reward, 2), done
                 ))
 
-                agent.train_model(state, action, reward, next_state, done)
+                agent.train_model(state, action_index, reward, next_state, done)
 
                 score += reward
                 state = next_state
@@ -154,14 +156,16 @@ if __name__ == "__main__":
                     episodes.append(e)
                     pylab.plot(episodes, scores, 'b')
                     pylab.savefig("./save/pendulum_a2c.png")
-                    print("episode:", e, "  score:", score)
+                    print("********** episode:{0} is Done!!! || score:{1} || info:{2} **********".format(
+                        e, score, info
+                    ))
 
                     if 0 <= score:
                         agent.actor.save_weights("./save/pendulum_actor.h5")
                         agent.critic.save_weights("./save/pendulum_critic.h5")
                         max_score = score
-                    # 이전 10개 에피소드의 점수 평균이 490보다 크면 학습 중단
-                    if np.mean(scores[-min(10, len(scores)):]) > 190:
+                    # 이전 10개 에피소드의 점수 평균이 -0.05보다 크면 학습 중단
+                    if np.mean(scores[-min(10, len(scores)):]) > -20:
                         agent.actor.save_weights("./save/pendulum_actor.h5")
                         agent.critic.save_weights("./save/pendulum_critic.h5")
                         env.close()
@@ -170,30 +174,3 @@ if __name__ == "__main__":
 
     except KeyboardInterrupt as e:
         env.close()
-
-#     MAX_NUM_STEP = 1000
-
-#     try:
-#         for step in range(MAX_NUM_STEP):
-#             if step % 2 == 0:
-#                 action = random.randrange(0, 100)
-#             else:
-#                 action = random.randrange(-100, 0)
-#
-#             next_state, reward, done = env.step(action)
-#
-#             now = datetime.now()
-#             print(now)
-#
-#             print("action: {0} -->\nnext State: {1}\nreward: {2}\ndone: {3}\n".format(
-#                 action,
-#                 next_state,
-#                 reward,
-#                 done
-#             ))
-#
-#             time.sleep(0.1)
-#
-#         env.close()
-#     except KeyboardInterrupt as e:
-#         env.close()
