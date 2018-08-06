@@ -41,7 +41,6 @@ class Env:
 
         self.steps = 0
         self.done = False
-        self.reward = 0
         self.rewards = []
         self.info = None
         self_env = self
@@ -58,26 +57,25 @@ class Env:
             pendulum_info = str(msg.payload)
             msg = pendulum_info.split(":")
             theta = int(msg[1].split(',')[0])
-            rpm = int(msg[2].split("'")[0])
-            self_env.__insert_angle_info_to_buffer(device=Device.pendulum, theta=theta, rpm=rpm)
+            theta_dot = int(msg[2].split("'")[0])
+            self_env.__insert_angle_info_to_buffer(device=Device.pendulum, theta=theta, theta_dot=theta_dot)
             #print("Pendulum Angle value: {0}, {1}".format(angle, speed))
         elif msg.topic == MQTT_MOTOR_ANGLE_TOPIC:
             motor_info = str(msg.payload)
             msg = motor_info.split(":")
             theta = int(msg[1].split("'")[0])
-            self_env.__insert_angle_info_to_buffer(device=Device.motor, theta=theta, rpm=0)
+            self_env.__insert_angle_info_to_buffer(device=Device.motor, theta=theta, theta_dot=0)
             #print("Motor Angle value: {0}, {1}".format(angle, speed))
 
-    def __insert_angle_info_to_buffer(self, device, theta, rpm):
+    def __insert_angle_info_to_buffer(self, device, theta, theta_dot):
+        cosine_theta = math.cos(float(theta))
+        sine_theta = math.sin(float(theta))
         rad = math.radians(theta)
-        cosine_theta = math.cos(float(rad))
-        sine_theta = math.sin(float(rad))
         time_epoch = datetime.now().timestamp()
         if device == Device.pendulum:
-            # normalization, rpm / 20
-            self.pendulum_info_buffer.append((time_epoch, rad, [cosine_theta, sine_theta, rpm / 20]))
+            self.pendulum_info_buffer.append((time_epoch, rad, [cosine_theta, sine_theta, theta_dot / 20]))
         elif device == Device.motor:
-            self.motor_info_buffer.append((time_epoch, rad, [cosine_theta, sine_theta]))
+            self.motor_info_buffer.append((time_epoch, theta, [cosine_theta, sine_theta]))
         else:
             raise AttributeError("Unrecognized Device")
 
@@ -95,72 +93,53 @@ class Env:
     ###  Environment Methods: reset, step, close ###
     ################################################
     def reset(self):
-        # reset position
         self.steps = 0
-        self.reward = 0
         self.done = False
         del self.rewards[:]
 
         # reset position
         self.pub.publish(topic=MQTT_MOTOR_POWER_TOPIC, payload="speed:" + str(999999))
 
-        # cnt_cleep = 0
-        # while cnt_cleep < 10:
-        #     print(".", end="")
-        #     time.sleep(1)
-        #     cnt_cleep += 1
-        # print()
-
-        self.pub.publish(topic=MQTT_MOTOR_POWER_TOPIC, payload="rectify")
-
-        time.sleep(7.0)
-
-        self.pendulum_info_buffer.clear()
-        self.motor_info_buffer.clear()
-
         # wait while buffers are not empty
         while True:
             if len(self.pendulum_info_buffer) != 0 and len(self.motor_info_buffer) != 0:
                 break
-            # else:
-            #     print("{0} - {1}".format(len(self.pendulum_info_buffer), len(self.motor_info_buffer)))
-            time.sleep(0.001)
+            time.sleep(0.01)
 
-        # pendulum_info = [time_epoch, radian, [cos(radian), sin(radian), rpm]]
+        # pendulum_info = [time_epoch, radian, [cos(theta), sin(theta), theta_dot]]
         pendulum_info = self.pendulum_info_buffer.pop()
-        # motor_info = [time_epoch, theta, [cos(radian), sin(radian)]]
+        # motor_info = [time_epoch, theta, [cos(theta), sin(theta)]]
         motor_info = self.motor_info_buffer.pop()
 
-
-        # return [cos(p_rad), sin([p_rad), p_rpm, cos(m_rad), sin(m_rad)]
+        # return [cos(p_theta), sin(p_theta), p_theta_dot, cos(m_theta), sin(m_theta)]
         return pendulum_info[2] + motor_info[2]
 
     def step(self, action):
         self.steps += 1
 
-        # set action
+        # action
         self.pub.publish(topic=MQTT_MOTOR_POWER_TOPIC, payload="speed:" + str(action))
 
         # wait while buffers are not empty
         while True:
             if len(self.pendulum_info_buffer) != 0 and len(self.motor_info_buffer) != 0:
                 break
-            time.sleep(0.001)
-            # print("step:  {0}  {1}".format(len(self.pendulum_info_buffer), len(self.motor_info_buffer)))
+            time.sleep(0.01)
+            # print("step:  {0}  {1}".format(len(self.pendulum_angle_buffer), len(self.motor_angle_buffer)))
 
-        # pendulum_info = [time_epoch, radian, [cos(radian), sin(radian), rpm]]
+        # pendulum_info = [time_epoch, radian, [cos(theta), sin(theta), theta_dot]]
         pendulum_info = self.pendulum_info_buffer.pop()
-        # motor_info = [time_epoch, radian, [cos(radian), sin(radian)]]
+        # motor_info = [time_epoch, theta, [cos(theta), sin(theta)]]
         motor_info = self.motor_info_buffer.pop()
 
         # action normalization (-2 ~ 2)
         n_action = action / 50.0
         # reward = -(pendulum_radian^2 + 0.1 * pendulum_theta_dot^2 + 0.01 * action^2)
-        self.reward = -((pendulum_info[1] ** 2) + (0.1 * (pendulum_info[2][2] ** 2)) + (0.01 * (n_action ** 2)))
-        self.reward += 1 if pendulum_info[1] ** 2 < 0.1 else 0
-        self.rewards.append(self.reward)
+        reward = -((pendulum_info[1] ** 2) + (0.1 * (pendulum_info[2][2] ** 2)) + (0.01 * (n_action ** 2)))
 
-        self.isDone(pendulum_info[1], motor_info[1])
+        self.rewards.append(reward)
+
+        self.isDone(motor_info[1])
 
         # pendulum_angle_time_epoch = datetime.fromtimestamp(
         #     pendulum_angle[0]
@@ -176,36 +155,20 @@ class Env:
         # ))
 
         # return state, reward, done, info
-        return pendulum_info[2] + motor_info[2], self.reward, self.done, self.info
-
-    def episode_reset(self):
-        self.steps = 0
-        self.reward = 0
-        self.done = False
-        del self.rewards[:]
-
-        # reset position
-        self.pub.publish(topic=MQTT_MOTOR_POWER_TOPIC, payload="speed:" + str(999999))
-        self.pendulum_info_buffer.clear()
-        self.motor_info_buffer.clear()
+        return pendulum_info[2] + motor_info[2], reward, self.done, self.info
 
     def close(self):
         self.pub.publish(topic=MQTT_MOTOR_POWER_TOPIC, payload="speed:0")   # set motor speed 0
 
-    def isDone(self, pendulum_angle, motor_pos):
-        # if pendulum_angle < -0.436 or pendulum_angle > 0.436:
-        if pendulum_angle < -1.57 or pendulum_angle > 1.57:
-            self.info = "fall down: " + str(pendulum_angle)
-            self.done = True
-        elif self.steps > 300:                        # maximum step
+    def isDone(self, motor_pos):
+        if self.steps > 300:                        # maximum step
             self.info = "max step"
             self.done = True
-        elif np.mean(self.rewards[-30:]) > 20:      # success
+        elif np.mean(self.rewards[-30:]) > -0.1:    # success
             self.info = "success"
             self.done = True
-        elif motor_pos > 3.141592 * 2 or motor_pos < -3.141592 * 2:   # limit motor position
-            self.info = "limit position, pos:" + str(round(motor_pos, 4))
-            self.reward = -100
+        elif motor_pos > 360 or motor_pos < -360:   # limit motor position
+            self.info = "limit position"
             self.done = True
         else:
             self.done = False
