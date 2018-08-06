@@ -44,6 +44,7 @@ class Env:
         self.reward = 0
         self.rewards = []
         self.info = None
+        self.isResetComplete=False
         self_env = self
 
     @staticmethod
@@ -67,6 +68,8 @@ class Env:
             theta = int(msg[1].split("'")[0])
             self_env.__insert_angle_info_to_buffer(device=Device.motor, theta=theta, rpm=0)
             #print("Motor Angle value: {0}, {1}".format(angle, speed))
+        elif True: # Reset Complete Test
+            pass
 
     def __insert_angle_info_to_buffer(self, device, theta, rpm):
         rad = math.radians(theta)
@@ -104,12 +107,8 @@ class Env:
         # reset position
         self.pub.publish(topic=MQTT_MOTOR_POWER_TOPIC, payload="speed:" + str(999999))
 
-        # cnt_cleep = 0
-        # while cnt_cleep < 10:
-        #     print(".", end="")
-        #     time.sleep(1)
-        #     cnt_cleep += 1
-        # print()
+        while not self.isResetComplete:
+            time.sleep(0.05)
 
         self.pub.publish(topic=MQTT_MOTOR_POWER_TOPIC, payload="rectify")
 
@@ -135,11 +134,12 @@ class Env:
         # return [cos(p_rad), sin([p_rad), p_rpm, cos(m_rad), sin(m_rad)]
         return pendulum_info[2] + motor_info[2]
 
-    def step(self, action):
+    def step(self, action_index):
+        motor_speed = (action_index - 5) * 20
         self.steps += 1
 
         # set action
-        self.pub.publish(topic=MQTT_MOTOR_POWER_TOPIC, payload="speed:" + str(action))
+        self.pub.publish(topic=MQTT_MOTOR_POWER_TOPIC, payload="speed:" + str(motor_speed))
 
         # wait while buffers are not empty
         while True:
@@ -154,7 +154,7 @@ class Env:
         motor_info = self.motor_info_buffer.pop()
 
         # action normalization (-2 ~ 2)
-        n_action = action / 50.0
+        n_action = motor_speed / 50.0
         # reward = -(pendulum_radian^2 + 0.1 * pendulum_theta_dot^2 + 0.01 * action^2)
         self.reward = -((pendulum_info[1] ** 2) + (0.1 * (pendulum_info[2][2] ** 2)) + (0.01 * (n_action ** 2)))
         self.reward += 1 if pendulum_info[1] ** 2 < 0.1 else 0

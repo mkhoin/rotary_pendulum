@@ -108,17 +108,15 @@ def on_connect(client, userdata, flags, rc) :
 
 def on_message(client, useradta, msg):
     if msg.payload.decode("utf-8") == "rectify":
-        last_angle = 0
         time.sleep(15.9)
-        pub.publish(MQTT_PENDULUM_ANGLE_TOPIC, payload="angle:0, speed:0")
-        return
+    else:
+        time.sleep(0.05)
+
     info = True
-    time.sleep(0.05)
     while info:
         ht, info = hta.update()     # [angle, acc_angle, rpm], isError
         time.sleep(0.001)
-    pub.publish(MQTT_PENDULUM_ANGLE_TOPIC, payload="angle:" + str(ht[0]-180) + ", speed:" + str(ht[2]))
-    #last_angle = ht[0] - 180
+        pub.publish(MQTT_PENDULUM_ANGLE_TOPIC, payload="angle:" + str(ht[0]-180) + ", speed:" + str(ht[2]))
 
 sub = mqtt.Client()
 sub.on_connect = on_connect
@@ -129,5 +127,5 @@ sub.connect(MQTT_SERVER, 1883, 60)
 try :
     sub.loop_forever()
 except KeyboardInterrupt :
-    sub.unsubscribe(["Motor/power"])
+    sub.unsubscribe([MQTT_MOTOR_POWER_TOPIC])
     sub.disconnect()

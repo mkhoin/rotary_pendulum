@@ -87,7 +87,7 @@ sub.connect(MQTT_SERVER, 1883, 60)
 try:
     sub.loop_forever()
 except KeyboardInterrupt :
-    sub.unsubscribe(["Motor/speed"])
+    sub.unsubscribe([MQTT_MOTOR_POWER_TOPIC])
     sub.disconnect()
     psm.BAM1.brake()
 

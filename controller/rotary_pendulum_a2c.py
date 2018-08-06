@@ -177,8 +177,7 @@ if __name__ == "__main__":
                 #     action_index = agent.get_action(state)
                 action_index = agent.get_action(state)
 
-                action = (action_index - 5) * 20
-                next_state, reward, done, info = env.step(action)
+                next_state, reward, done, info = env.step(action_index)
                 next_state = np.reshape(next_state, [1, state_size])
                 step += 1
 
