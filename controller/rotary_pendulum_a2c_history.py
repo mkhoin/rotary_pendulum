@@ -1,4 +1,4 @@
-from environment import Env
+from environment3 import Env
 import pylab
 import math
 import numpy as np
@@ -9,34 +9,35 @@ from keras.optimizers import Adam, SGD, RMSprop
 from keras import backend as K
 from datetime import datetime
 import sys
+import os.path
+
 import random
 import time
 
 K.clear_session()
-EPISODES = 2000
+EPISODES = 20000
 
 class A2CAgent:
-    def __init__(self, state_size, action_size):
+    def __init__(self, state_size, action_size, history_size):
         self.load_model = False
+        if os.path.exists("./save/pendulum_actor.h5"):
+            self.load_model = True
 
         # 상태와 행동의 크기 정의
-        self.state_size = state_size
+        self.state_size = state_size * history_size
         self.action_size = action_size
         self.value_size = 1
 
         # 액터-크리틱 하이퍼파라미터
         self.discount_factor = 0.99
-        self.actor_lr = 0.00001
-        self.critic_lr = 0.00001
-        self.initial_train_episodes = 5
+        self.actor_lr = 0.0001
+        self.critic_lr = 0.0005
 
         # 정책신경망과 가치신경망 생성
         self.actor = self.build_actor()
         self.critic = self.build_critic()
         self.actor_updater = self.actor_optimizer()
         self.critic_updater = self.critic_optimizer()
-        self.actor_updater2 = self.actor_optimizer2()
-        self.critic_updater2 = self.critic_optimizer2()
 
         if self.load_model:
             self.actor.load_weights("./save/pendulum_actor.h5")
@@ -45,9 +46,9 @@ class A2CAgent:
     # actor: 상태를 받아 각 행동의 확률을 계산
     def build_actor(self):
         actor = Sequential()
-        actor.add(Dense(48, input_dim=self.state_size, activation='relu', kernel_initializer='he_uniform'))
-        actor.add(Dense(48, activation='relu', kernel_initializer='he_uniform'))
-        actor.add(Dense(48, activation='relu', kernel_initializer='he_uniform'))
+        actor.add(Dense(32, input_dim=self.state_size, activation='relu', kernel_initializer='he_uniform'))
+        actor.add(Dense(32, activation='relu', kernel_initializer='he_uniform'))
+        actor.add(Dense(32, activation='relu', kernel_initializer='he_uniform'))
         actor.add(Dense(self.action_size, activation='softmax', kernel_initializer='he_uniform'))
         actor.summary()
         return actor
@@ -55,8 +56,9 @@ class A2CAgent:
     # critic: 상태를 받아서 상태의 가치를 계산
     def build_critic(self):
         critic = Sequential()
-        critic.add(Dense(48, input_dim=self.state_size, activation='relu', kernel_initializer='he_uniform'))
-        critic.add(Dense(48, activation='relu', kernel_initializer='he_uniform'))
+        critic.add(Dense(32, input_dim=self.state_size, activation='relu', kernel_initializer='he_uniform'))
+        critic.add(Dense(32, activation='relu', kernel_initializer='he_uniform'))
+        critic.add(Dense(32, activation='relu', kernel_initializer='he_uniform'))
         critic.add(Dense(self.value_size, activation='linear', kernel_initializer='he_uniform'))
         critic.summary()
         return critic
@@ -64,12 +66,7 @@ class A2CAgent:
     # 정책신경망의 출력을 받아 확률적으로 행동을 선택
     def get_action(self, state):
         policy = self.actor.predict(state, batch_size=1).flatten()
-        if np.isnan(policy[0]):
-            action = random.randrange(0, 11)
-            print(state, "---", policy, "---", action)
-            pass
-        else:
-            action = np.random.choice(self.action_size, 1, p=policy)[0]
+        action = np.random.choice(self.action_size, 1, p=policy)[0]
         return action
 
     # 정책신경망을 업데이트하는 함수
@@ -81,7 +78,7 @@ class A2CAgent:
         cross_entropy = K.log(action_prob) * advantage
         loss = -K.sum(cross_entropy)
 
-        optimizer = RMSprop(lr=self.actor_lr)
+        optimizer = Adam(lr=self.actor_lr)
         updates = optimizer.get_updates(self.actor.trainable_weights, [], loss)
         train = K.function([self.actor.input, action, advantage], [], updates=updates)
         return train
@@ -92,33 +89,7 @@ class A2CAgent:
 
         loss = K.mean(K.square(target - self.critic.output))
 
-        optimizer = RMSprop(lr=self.critic_lr)
-        updates = optimizer.get_updates(self.critic.trainable_weights, [], loss)
-        train = K.function([self.critic.input, target], [], updates=updates)
-
-        return train
-
-    # 정책신경망을 업데이트하는 함수
-    def actor_optimizer2(self):
-        action = K.placeholder(shape=[None, self.action_size])
-        advantage = K.placeholder(shape=[None, ])
-
-        action_prob = K.sum(action * self.actor.output, axis=1)
-        cross_entropy = K.log(action_prob) * advantage
-        loss = -K.sum(cross_entropy)
-
-        optimizer = RMSprop(lr=self.actor_lr * 50)
-        updates = optimizer.get_updates(self.actor.trainable_weights, [], loss)
-        train = K.function([self.actor.input, action, advantage], [], updates=updates)
-        return train
-
-    # 가치신경망을 업데이트하는 함수
-    def critic_optimizer2(self):
-        target = K.placeholder(shape=[None, ])
-
-        loss = K.mean(K.square(target - self.critic.output))
-
-        optimizer = RMSprop(lr=self.critic_lr * 50)
+        optimizer = Adam(lr=self.critic_lr)
         updates = optimizer.get_updates(self.critic.trainable_weights, [], loss)
         train = K.function([self.critic.input, target], [], updates=updates)
 
@@ -140,12 +111,9 @@ class A2CAgent:
             advantage = (reward + self.discount_factor * next_value) - value
             target = reward + self.discount_factor * next_value
 
-        if episode < self.initial_train_episodes and self.load_model == False:
+        if not self.load_model:
             self.actor_updater([state, act, advantage])
             self.critic_updater([state, target])
-        else:
-            self.actor_updater2([state, act, advantage])
-            self.critic_updater2([state, target])
 
 
 if __name__ == "__main__":
@@ -154,36 +122,46 @@ if __name__ == "__main__":
 
     state_size = env.state_space_shape[0]
     action_size = env.action_space_shape[0]
+    history_size = 4
 
     # 액터-크리틱(A2C) 에이전트 생성
-    agent = A2CAgent(state_size, action_size)
+    agent = A2CAgent(state_size, action_size, history_size)
 
     scores, episodes, steps = [], [], []
+
+    episode_start_num = 0
+    if os.path.exists("./save/lastest_episode_num.txt"):
+        with open("./save/lastest_episode_num.txt", 'r') as f:
+            episode_start_num = int(f.readline())
+
     try:
-        for episode in range(EPISODES):
+        for episode in range(episode_start_num, EPISODES):
             done = False
             score = 0
             step = 0
 
             state = env.reset()
-            state = np.reshape(state, [1, state_size])
+
+            history = np.stack((state, state, state, state), axis=1)
+            history = np.reshape(history, (1, state_size, history_size))
+
             while not done:
-                # if episode < agent.initial_train_episodes and agent.load_model == False:              # explore in the first episode
-                #     if step % 4 < 2:
-                #         action_index = random.randrange(6, 11)
-                #     else:
-                #         action_index = random.randrange(0, 5)
-                # else:
-                #     action_index = agent.get_action(state)
-                action_index = agent.get_action(state)
+                flat_history = np.reshape(history, (1, state_size * history_size))
+                action_index = agent.get_action(flat_history)
 
                 next_state, reward, done, info = env.step(action_index)
-                next_state = np.reshape(next_state, [1, state_size])
+                next_state = np.reshape(next_state, [1, state_size, 1])
+
+                next_history = np.append(next_state, history[:, :, :history_size - 1], axis=2)
+                flat_next_history = np.reshape(next_history, (1, state_size * history_size))
+
                 step += 1
 
                 rad = math.acos(next_state[0][0])
-                print("episode:{0} || step:{1} || action:{2} || pendulum radian:{3} || reward:{4} || done:{5}".format(
+                print("episode:{0} || time:{1} || step:{2} || action:{3} || pendulum radian:{4} || reward:{5} || done:{6}"
+                    .format(
                     episode,
+                    datetime.utcnow().strftime('%H-%M-%S.%f')[:-3],
                     step,
                     action_index,
                     # round(next_state[0][0], 4),
@@ -192,10 +170,10 @@ if __name__ == "__main__":
                     done
                 ))
 
-                agent.train_model(state, action_index, reward, next_state, done, episode)
+                agent.train_model(flat_history, action_index, reward, flat_next_history, done, episode)
 
                 score += reward
-                state = next_state
+                history = next_history
 
                 # now = datetime.now()
                 # print(now - last)
@@ -209,17 +187,28 @@ if __name__ == "__main__":
                     scores.append(score)
                     episodes.append(episode)
                     pylab.plot(episodes, scores, 'b')
-                    pylab.savefig("./save/pendulum_a2c.png")
+                    pylab.savefig("./save/pendulum_a2c_history.png")
                     print()
                     print("*** episode:{0} is Done!!! || score:{1} || step:{2} || info:{3} ***".format(
                         episode, score, step, info
                     ))
                     steps.append(step)
                     print()
+                    sys.stdout.flush()
+
+                    #env.episode_reset()
 
                     if episode % 50 == 0:
                         print("average of recent 50 steps :", str(np.mean(steps[-50:])))
                         print()
+                        sys.stdout.flush()
+                        agent.actor.save_weights("./save/pendulum_actor.h5")
+                        agent.critic.save_weights("./save/pendulum_critic.h5")
+
+                        f = open("./save/lastest_episode_num.txt", 'w')
+                        f.write(str(episode)+"\n")
+                        f.close()
+
                     #if -10 <= score:
                         #agent.actor.save_weights("./save/pendulum_actor.h5")
                         #agent.critic.save_weights("./save/pendulum_critic.h5")

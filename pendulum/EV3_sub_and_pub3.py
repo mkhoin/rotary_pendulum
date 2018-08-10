@@ -7,20 +7,23 @@ from smbus import SMBus
 import threading
 import ctypes
 
-speed = 0
-
 MQTT_SERVER = '192.168.137.4'
 
 MQTT_MOTOR_AND_PENDULUM_STATE = 'state_info'
+MQTT_PENDULUM_STATE_FOR_RECTIFY = 'pendulum_state_for_rectify'
+
 MQTT_MOTOR_RECTIFY_COMPLETE = 'rectify_complete'
 MQTT_MOTOR_TO_PENDULUM = 'motor_angle'
+MQTT_MOTOR_RECTIFY = 'rectify'
+MQTT_MOTOR_STILL_RECTIFY = 'motor_still_rectify'
 
-sub_topic_list = [MQTT_MOTOR_RECTIFY_COMPLETE, MQTT_MOTOR_TO_PENDULUM]
-pub_topic_list = [MQTT_MOTOR_AND_PENDULUM_STATE]
+sub_topic_list = [MQTT_MOTOR_RECTIFY_COMPLETE, MQTT_MOTOR_TO_PENDULUM, MQTT_MOTOR_RECTIFY, MQTT_MOTOR_STILL_RECTIFY]
+pub_topic_list = [MQTT_MOTOR_AND_PENDULUM_STATE, MQTT_PENDULUM_STATE_FOR_RECTIFY]
 
 MODE_NORMAL = 0x00
 MODE_CALIBRATE = 0x43
 MODE_RESET = 0x52
+
 
 self_pendulum = None
 class Pendulum:
@@ -31,32 +34,46 @@ class Pendulum:
         self.pub = pub
         self.hta = hta
 
+        self.angle = 0
         self.speed = 0
+        getting_sensor_data_forever = threading.Thread(target=self.get_pendulum_sensor_data)
+        getting_sensor_data_forever.daemon = True
+        getting_sensor_data_forever.start()
 
     @staticmethod
     def on_connect(client, userdata, flags, rc):
         print("mqtt broker connected with result code " + str(rc))
         client.subscribe(topic=MQTT_MOTOR_RECTIFY_COMPLETE)
         client.subscribe(topic=MQTT_MOTOR_TO_PENDULUM)
+        client.subscribe(topic=MQTT_MOTOR_RECTIFY)
+        client.subscribe(topic=MQTT_MOTOR_STILL_RECTIFY)
 
     @staticmethod
     def on_message(client, useradta, msg):
-        if msg.topic in sub_topic_list:
+        if msg.topic == MQTT_MOTOR_RECTIFY_COMPLETE or msg.topic == MQTT_MOTOR_TO_PENDULUM:
+            print(msg.topic, end=',')
             motor_angle = str(msg.payload.decode("utf-8"))
-            pendulum_angle, pendulum_speed = self_pendulum.get_pendulum_state()
-            self_pendulum.pub.publish(topic=MQTT_MOTOR_AND_PENDULUM_STATE, payload=pendulum_angle+'|'+pendulum_speed+'|'+motor_angle)
+            print(self_pendulum.angle)
+            self_pendulum.pub.publish(
+                topic=MQTT_MOTOR_AND_PENDULUM_STATE,
+                payload=self_pendulum.angle+'|'+self_pendulum.speed+'|'+motor_angle
+            )
 
-    def start_sub_thread(self):
-        s = threading.Thread(target=self.__sub, args=(self.sub,))
-        s.daemon = True
-        s.start()
+        if msg.topic == MQTT_MOTOR_RECTIFY or msg.topic == MQTT_MOTOR_STILL_RECTIFY:
+            print(msg.topic)
+            self_pendulum.pub.publish(
+                topic=MQTT_PENDULUM_STATE_FOR_RECTIFY,
+                payload=self_pendulum.angle+'|'+self_pendulum.speed
+            )
 
-    def get_pendulum_state(self):
-        info = True
-        while info:
-            ht, info = self.hta.update()  # [angle, acc_angle, rpm], isError
-            time.sleep(0.001)
-        return (str(ht[0] - 180), str(ht[2]))
+    def get_pendulum_sensor_data(self):
+        while True:
+            angle, acc_angle, rpm = self.hta.update()  # [angle, acc_angle, rpm], isError
+            # sensing_error_check = abs(abs(float(self.angle)/57) - abs(float(angle)/57))/0.01
+            # if sensing_error_check <= 1.5*rpm/9.55 and sensing_error_check >= 0.5*rpm/9.55:
+            self.angle = str(angle - 180)
+            self.speed = str(rpm)
+            time.sleep(0.01)
 
 
 class HTAngle:
@@ -93,13 +110,13 @@ class HTAngle:
             try:
                 data = self.bus.read_i2c_block_data(self.address, 0x41, 10)
                 isError = False
-            except OSError as e:
+            except (TypeError, OSError) as e:
                 print(e)
                 isError = True
 
         # error filtering
         if data[1] == data[2] == data[3] == data[4] == data[5] == data[6] == data[7] == data[8] == 0xff:
-            return (self.angle, self.acc_angle, self.rpm), True
+            return (self.angle, self.acc_angle, self.rpm)
 
         # angle
         self.angle = (data[1] & 0xff) * 2 + (data[2] & 0x01) + ((data[2] & 0x80) << 1)
@@ -124,7 +141,7 @@ class HTAngle:
             self.rpm = (0x8000 - rpm) * (-1)
         else:
             self.rpm = rpm
-        return (self.angle, self.acc_angle, self.rpm), False
+        return (self.angle, self.acc_angle, self.rpm)
 
 
 if __name__ == "__main__":

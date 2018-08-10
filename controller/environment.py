@@ -27,7 +27,7 @@ class Env:
         self.state_space_shape = (5,)
         self.action_space_shape = (11,)
 
-        self.sub = mqtt.Client(client_id="angle_sub", transport="UDP")
+        self.sub = mqtt.Client(client_id="angle_sub", transport="TCP")
         self.sub.on_connect = self.__on_connect
         self.sub.on_message = self.__on_message
         self.sub.connect(MQTT_SERVER, 1883, 60)
@@ -36,7 +36,7 @@ class Env:
         s.daemon = True
         s.start()
 
-        self.pub = mqtt.Client(client_id="motor_power_pub", transport="UDP")
+        self.pub = mqtt.Client(client_id="motor_power_pub", transport="TCP")
         self.pub.connect(MQTT_SERVER, 1883, 60)
 
         self.steps = 0

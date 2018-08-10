@@ -84,7 +84,7 @@ class HTAngle:
         return (self.angle, self.acc_angle, self.rpm), False
 
 
-pub = mqtt.Client(client_id="pendulum_angle_pub", transport="UDP")
+pub = mqtt.Client(client_id="pendulum_angle_pub", transport="TCP")
 pub.connect(MQTT_SERVER, 1883, 60)
 
 while True:

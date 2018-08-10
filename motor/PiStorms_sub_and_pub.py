@@ -10,7 +10,7 @@ MQTT_SERVER = '10.0.0.1'
 MQTT_MOTOR_POWER_TOPIC = 'Motor/power'
 MQTT_MOTOR_ANGLE_TOPIC = 'Motor/angle'
 
-pub = mqtt.Client(client_id="motor_angle_pub", transport="UDP")
+pub = mqtt.Client(client_id="motor_angle_pub", transport="TCP")
 pub.connect(MQTT_SERVER, 1883, 60)
 
 def on_connect(client, userdata, flags, rc) :
