@@ -66,7 +66,7 @@ class Pendulum:
                 payload=self_pendulum.angle+'|'+self_pendulum.speed
             )
 
-    def get_pendulum_sensor_data(self):
+    def    (self):
         while True:
             angle, acc_angle, rpm = self.hta.update()  # [angle, acc_angle, rpm], isError
             # sensing_error_check = abs(abs(float(self.angle)/57) - abs(float(angle)/57))/0.01

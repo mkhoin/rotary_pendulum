@@ -132,63 +132,63 @@ class Motor:
         pen_angle = angle
         pen_speed = speed
         print(pen_angle, pen_speed)
-        # if pen_angle <= 10 and pen_angle >= -10:
-        #     self.psm.BAM1.hold()
-        #     if pen_speed < 0:
-        #         self.psm.BAM1.setSpeed(100)
-        #     else:
-        #         self.psm.BAM1.setSpeed(-100)
-        #     time.sleep(0.02)
-        #     self.pub.publish(topic=MQTT_MOTOR_RECTIFY_COMPLETE, payload=self.get_angle())
-        #     print("successfully rectified")
-        #     return
-        # abs_pen_angle = abs(pen_angle)
-        # if abs_pen_angle >= 130:
-        #     if pen_speed < 0:
-        #         self.psm.BAM1.setSpeed(-60)
-        #         time.sleep(0.1)
-        #     else:
-        #         self.psm.BAM1.setSpeed(60)
-        #         time.sleep(0.1)
-        # elif abs_pen_angle < 130 and abs_pen_angle >= 90:
-        #     if pen_speed < 0:
-        #         self.psm.BAM1.setSpeed(-40)
-        #         time.sleep(0.1)
-        #     else:
-        #         self.psm.BAM1.setSpeed(40)
-        #         time.sleep(0.1)
-        # elif abs_pen_angle < 90 and abs_pen_angle >= 70:
-        #     if pen_speed < 0:
-        #         self.psm.BAM1.setSpeed(-30)
-        #         time.sleep(0.1)
-        #     else:
-        #         self.psm.BAM1.setSpeed(30)
-        #         time.sleep(0.1)
+        if pen_angle <= 10 and pen_angle >= -10:
+            self.psm.BAM1.hold()
+            if pen_speed < 0:
+                self.psm.BAM1.setSpeed(100)
+            else:
+                self.psm.BAM1.setSpeed(-100)
+            time.sleep(0.02)
+            self.pub.publish(topic=MQTT_MOTOR_RECTIFY_COMPLETE, payload=self.get_angle())
+            print("successfully rectified")
+            return
+        abs_pen_angle = abs(pen_angle)
+        if abs_pen_angle >= 140:
+            if pen_speed < 0:
+                self.psm.BAM1.setSpeed(-40)
+                time.sleep(0.1)
+            else:
+                self.psm.BAM1.setSpeed(40)
+                time.sleep(0.1)
+        elif abs_pen_angle < 140 and abs_pen_angle >= 110:
+            if pen_speed < 0:
+                self.psm.BAM1.setSpeed(-30)
+                time.sleep(0.1)
+            else:
+                self.psm.BAM1.setSpeed(30)
+                time.sleep(0.1)
+        elif abs_pen_angle < 110 and abs_pen_angle >= 90:
+            if pen_speed < 0:
+                self.psm.BAM1.setSpeed(-10)
+                time.sleep(0.1)
+            else:
+                self.psm.BAM1.setSpeed(10)
+                time.sleep(0.1)
         # else:
         #     if pen_speed < 0:
-        #         self.psm.BAM1.setSpeed(-20)
+        #         self.psm.BAM1.setSpeed(-15)
         #         time.sleep(0.1)
         #     else:
-        #         self.psm.BAM1.setSpeed(20)
+        #         self.psm.BAM1.setSpeed(15)
         #         time.sleep(0.1)
         # abs_pen_angle = abs(pen_angle)
         #
         # print("Fire Pub -", abs_pen_angle)
 
         ####################TESET#########################################################
-        gpio.output(led_pin, self_motor.led_flag)
-        if self_motor.led_flag:
-            self.led_flag=False
-        else:
-            self.led_flag=True
-        # self.time += 0.01
-        # setting_speed = 30.0*math.sin(2 * PI * MOTOR_FREQ * self.time)
-        abs_pen_angle = abs(pen_angle)
-
-        if self.led_flag:
-            self.psm.BAM1.setSpeed(100)
-        else:
-            self.psm.BAM1.setSpeed(-100)
+        # gpio.output(led_pin, self_motor.led_flag)
+        # if self_motor.led_flag:
+        #     self.led_flag=False
+        # else:
+        #     self.led_flag=True
+        # # self.time += 0.01
+        # # setting_speed = 30.0*math.sin(2 * PI * MOTOR_FREQ * self.time)
+        # abs_pen_angle = abs(pen_angle)
+        #
+        # if self.led_flag:
+        #     self.psm.BAM1.setSpeed(100)
+        # else:
+        #     self.psm.BAM1.setSpeed(-100)
 
         # if pen_angle <= 10 and pen_angle >= -10:
         #     self.psm.BAM1.hold()

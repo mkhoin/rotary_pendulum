@@ -209,10 +209,6 @@ if __name__ == "__main__":
                         f.write(str(episode)+"\n")
                         f.close()
 
-                    #if -10 <= score:
-                        #agent.actor.save_weights("./save/pendulum_actor.h5")
-                        #agent.critic.save_weights("./save/pendulum_critic.h5")
-                        #max_score = score
                     # 이전 10개 에피소드의 점수 평균이 -30보다 크면 학습 중단
                     #if np.mean(scores[-min(10, len(scores)):]) > -30:
                     #    agent.actor.save_weights("./save/pendulum_actor.h5")
